@@ -1,44 +1,46 @@
 //@version=6
 //============================================================
 // Indicator : EMA Cluster PSAR Breakout
-// Version   : V1.0
+// Version   : V1.1
 //
 // BUY Conditions
 // 1. EMA 5,10,20 are clubbed
 // 2. Bullish candle crosses above all EMAs
 // 3. PSAR below price
+// 4. Volume above average (participation filter)
+// 5. Candle body is a significant part of the range (conviction filter)
 //
 // SELL Conditions
 // 1. EMA 5,10,20 are clubbed
 // 2. Bearish candle crosses below all EMAs
 // 3. PSAR above price
+// 4. Volume above average (participation filter)
+// 5. Candle body is a significant part of the range (conviction filter)
 //
 //============================================================
-
 indicator("EMA Cluster PSAR Breakout", shorttitle="EMA Cluster PSAR Breakout", overlay=true)
+
 //========================
 // Inputs
 //========================
-
-emaFastLength = input.int(5, "EMA Fast")
-emaMidLength  = input.int(10, "EMA Medium")
-emaSlowLength = input.int(20, "EMA Slow")
-
+emaFastLength  = input.int(5, "EMA Fast")
+emaMidLength   = input.int(10, "EMA Medium")
+emaSlowLength  = input.int(20, "EMA Slow")
 clusterPercent = input.float(0.30,
      "EMA Cluster (%)",
      step = 0.05)
-
 psarStep = input.float(0.02, "PSAR Step")
 psarMax  = input.float(0.20, "PSAR Maximum")
-
 showBuySell = input.bool(true, "Show Signals")
+
+volMultiplier = input.float(1.2, "Volume Multiplier", step = 0.1, group = "Filters")
+bodyRatioMin  = input.float(0.50, "Min Body/Range Ratio", step = 0.05, group = "Filters")
 
 telegramChatId = input.string("", "Telegram Chat ID", group = "Alerts")
 
 //========================
 // EMA Calculation
 //========================
-
 ema5  = ta.ema(close, emaFastLength)
 ema10 = ta.ema(close, emaMidLength)
 ema20 = ta.ema(close, emaSlowLength)
@@ -46,7 +48,6 @@ ema20 = ta.ema(close, emaSlowLength)
 //========================
 // Plot EMAs
 //========================
-
 plot(ema5,  color=color.red,   linewidth=2, title="EMA 5")
 plot(ema10, color=color.green, linewidth=2, title="EMA 10")
 plot(ema20, color=color.blue,  linewidth=2, title="EMA 20")
@@ -54,65 +55,67 @@ plot(ema20, color=color.blue,  linewidth=2, title="EMA 20")
 //========================
 // EMA Cluster Logic
 //========================
-
 highestEMA = math.max(ema5, math.max(ema10, ema20))
 lowestEMA  = math.min(ema5, math.min(ema10, ema20))
-
 clusterDistance = (highestEMA - lowestEMA) / close * 100
-
 emaCluster = clusterDistance <= clusterPercent
 
 //========================
 // Parabolic SAR
 //========================
-
 psar = ta.sar(psarStep, psarStep, psarMax)
-
 plot(psar, style=plot.style_cross, color=color.orange, title="PSAR")
-
 psarBull = psar < close
 psarBear = psar > close
 
 //========================
+// Volume Filter
+//========================
+avgVol = ta.sma(volume, 20)
+volumeCondition = volume > avgVol * volMultiplier
+
+//========================
+// Candle Body Filter
+//========================
+candleBody  = math.abs(close - open)
+candleRange = high - low
+bodyCondition = candleRange > 0 and candleBody / candleRange >= bodyRatioMin
+
+//========================
 // BUY Logic
 //========================
-
 // Candle opens below EMA cluster
 openBelow = open < lowestEMA
-
 // Candle closes above EMA cluster
 closeAbove = close > highestEMA
-
 bullishCandle = close > open
-
 buySignal =
      emaCluster and
      bullishCandle and
      openBelow and
      closeAbove and
-     psarBull
+     psarBull and
+     volumeCondition and
+     bodyCondition
 
 //========================
 // SELL Logic
 //========================
-
 openAbove = open > highestEMA
-
 closeBelow = close < lowestEMA
-
 bearishCandle = close < open
-
 sellSignal =
      emaCluster and
      bearishCandle and
      openAbove and
      closeBelow and
-     psarBear
+     psarBear and
+     volumeCondition and
+     bodyCondition
 
 //========================
 // Plot Signals
 //========================
-
 plotshape(showBuySell and buySignal,
      title="BUY",
      style=shape.labelup,
@@ -121,7 +124,6 @@ plotshape(showBuySell and buySignal,
      text="BUY",
      textcolor=color.white,
      size=size.small)
-
 plotshape(showBuySell and sellSignal,
      title="SELL",
      style=shape.labeldown,
@@ -134,9 +136,7 @@ plotshape(showBuySell and sellSignal,
 //========================
 // Alerts
 //========================
-
 signalType = buySignal ? "BUY" : sellSignal ? "SELL" : na
-
 if (buySignal or sellSignal) and telegramChatId != ""
     jsonMsg = '{"chat_id":"' + telegramChatId + '","text":"' +
          signalType + " Signal on " + syminfo.ticker +
