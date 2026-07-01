@@ -15,8 +15,7 @@
 //
 //============================================================
 
-indicator("EMA Cluster Breakout + PSAR", overlay = true)
-
+indicator("EMA Cluster PSAR Breakout", shorttitle="EMA Cluster PSAR Breakout", overlay=true)
 //========================
 // Inputs
 //========================
@@ -33,6 +32,8 @@ psarStep = input.float(0.02, "PSAR Step")
 psarMax  = input.float(0.20, "PSAR Maximum")
 
 showBuySell = input.bool(true, "Show Signals")
+
+telegramChatId = input.string("", "Telegram Chat ID", group = "Alerts")
 
 //========================
 // EMA Calculation
@@ -134,12 +135,11 @@ plotshape(showBuySell and sellSignal,
 // Alerts
 //========================
 
-alertcondition(
-     buySignal,
-     title="BUY ALERT",
-     message="BUY Signal on {{ticker}} Price={{close}}")
+signalType = buySignal ? "BUY" : sellSignal ? "SELL" : na
 
-alertcondition(
-     sellSignal,
-     title="SELL ALERT",
-     message="SELL Signal on {{ticker}} Price={{close}}")
+if (buySignal or sellSignal) and telegramChatId != ""
+    jsonMsg = '{"chat_id":"' + telegramChatId + '","text":"' +
+         signalType + " Signal on " + syminfo.ticker +
+         " (" + syminfo.description + ")" +
+         " Price=" + str.tostring(close) + '"}'
+    alert(jsonMsg, alert.freq_once_per_bar_close)
