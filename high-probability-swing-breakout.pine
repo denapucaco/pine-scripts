@@ -1,0 +1,87 @@
+//@version=6
+indicator("High Probability Swing Breakout Scanner", overlay=true)
+
+// ==========================
+// Moving Averages
+// ==========================
+ema5  = ta.ema(close, 5)
+ema10 = ta.ema(close, 10)
+ema20 = ta.ema(close, 20)
+ema50 = ta.ema(close, 50)
+
+// ==========================
+// Parabolic SAR
+// ==========================
+psar = ta.sar(0.02, 0.02, 0.2)
+
+// ==========================
+// Breakout Level
+// Previous 10-bar High
+// ==========================
+breakoutLevel = ta.highest(high, 10)[1]
+
+// ==========================
+// Volume
+// ==========================
+avgVol20 = ta.sma(volume, 20)
+
+// ==========================
+// Conditions
+// ==========================
+psarBull     = close > psar
+
+emaBull      = ema5 > ema10 and
+               ema10 > ema20
+
+trendBull    = close > ema50
+
+breakoutBull = close > breakoutLevel
+
+volumeBull   = volume > (1.5 * avgVol20)
+
+// Final Signal
+buySignal    = psarBull and 
+               emaBull and
+               trendBull and 
+               breakoutBull and 
+               volumeBull
+
+// ==========================
+// Plot EMAs
+// ==========================
+plot(ema5,  title="EMA 5", color = color.red)
+plot(ema10, title="EMA 10", color = color.green)
+plot(ema20, title="EMA 20", color = color.blue)
+plot(ema50, title="EMA 200", color = color.black, linewidth = 2)
+
+// ==========================
+// Plot Buy Signal
+// ==========================
+plotshape(
+     buySignal,
+     title="BUY",
+     location=location.belowbar,
+     style=shape.triangleup,
+     size=size.large,
+     text="BUY")
+
+// ==========================
+// Background Highlight
+// ==========================
+bgcolor(buySignal ? color.new(color.green, 85) : na)
+
+// ==========================
+// Alerts
+// ==========================
+alertcondition(
+     buySignal,
+     title="Swing Breakout BUY",
+     message="Bullish breakout detected on {{ticker}}")
+
+// ==========================
+// Show Breakout Level
+// ==========================
+plot(breakoutLevel,
+     title="10-Day Breakout Level",
+     style=plot.style_linebr,
+     color = color.orange)
