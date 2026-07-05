@@ -1,0 +1,179 @@
+//@version=6
+indicator(title="Pineify Supertrend", overlay=true, max_labels_count=500)
+
+//#region —————————————————————————————————————————————————— Common Dependence
+
+p_comm_time_range_to_unix_time(string time_range, int date_time = time, string timezone = syminfo.timezone) =>
+    int start_unix_time = na
+    int end_unix_time = na
+    int start_time_hour = na
+    int start_time_minute = na
+    int end_time_hour = na
+    int end_time_minute = na
+    if str.length(time_range) == 11
+        // Format: hh:mm-hh:mm
+        start_time_hour := math.floor(str.tonumber(str.substring(time_range, 0, 2)))
+        start_time_minute := math.floor(str.tonumber(str.substring(time_range, 3, 5)))
+        end_time_hour := math.floor(str.tonumber(str.substring(time_range, 6, 8)))
+        end_time_minute := math.floor(str.tonumber(str.substring(time_range, 9, 11)))
+    else if str.length(time_range) == 9
+        // Format: hhmm-hhmm
+        start_time_hour := math.floor(str.tonumber(str.substring(time_range, 0, 2)))
+        start_time_minute := math.floor(str.tonumber(str.substring(time_range, 2, 4)))
+        end_time_hour := math.floor(str.tonumber(str.substring(time_range, 5, 7)))
+        end_time_minute := math.floor(str.tonumber(str.substring(time_range, 7, 9)))
+    start_unix_time := timestamp(timezone, year(date_time, timezone), month(date_time, timezone), dayofmonth(date_time, timezone), start_time_hour, start_time_minute, 0)
+    end_unix_time := timestamp(timezone, year(date_time, timezone), month(date_time, timezone), dayofmonth(date_time, timezone), end_time_hour, end_time_minute, 0)
+    [start_unix_time, end_unix_time]
+
+p_comm_time_range_to_start_unix_time(string time_range, int date_time = time, string timezone = syminfo.timezone) =>
+    int start_time_hour = na
+    int start_time_minute = na
+    if str.length(time_range) == 11
+        // Format: hh:mm-hh:mm
+        start_time_hour := math.floor(str.tonumber(str.substring(time_range, 0, 2)))
+        start_time_minute := math.floor(str.tonumber(str.substring(time_range, 3, 5)))
+    else if str.length(time_range) == 9
+        // Format: hhmm-hhmm
+        start_time_hour := math.floor(str.tonumber(str.substring(time_range, 0, 2)))
+        start_time_minute := math.floor(str.tonumber(str.substring(time_range, 2, 4)))
+    timestamp(timezone, year(date_time, timezone), month(date_time, timezone), dayofmonth(date_time, timezone), start_time_hour, start_time_minute, 0)
+
+p_comm_time_range_to_end_unix_time(string time_range, int date_time = time, string timezone = syminfo.timezone) =>
+    int end_time_hour = na
+    int end_time_minute = na
+    if str.length(time_range) == 11
+        end_time_hour := math.floor(str.tonumber(str.substring(time_range, 6, 8)))
+        end_time_minute := math.floor(str.tonumber(str.substring(time_range, 9, 11)))
+    else if str.length(time_range) == 9
+        end_time_hour := math.floor(str.tonumber(str.substring(time_range, 5, 7)))
+        end_time_minute := math.floor(str.tonumber(str.substring(time_range, 7, 9)))
+    timestamp(timezone, year(date_time, timezone), month(date_time, timezone), dayofmonth(date_time, timezone), end_time_hour, end_time_minute, 0)
+
+p_comm_timeframe_to_seconds(simple string tf) =>
+    float seconds = 0
+    tf_lower = str.lower(tf)
+    value = str.tonumber(str.substring(tf_lower, 0, str.length(tf_lower) - 1))
+    if str.endswith(tf_lower, 's')
+        seconds := value
+    else if str.endswith(tf_lower, 'd')
+        seconds := value * 86400
+    else if str.endswith(tf_lower, 'w')
+        seconds := value * 604800
+    else if str.endswith(tf_lower, 'm')
+        seconds := value * 2592000
+    else
+        seconds := str.tonumber(tf_lower) * 60
+    seconds
+
+p_custom_sources() =>
+    [open, high, low, close, volume]
+
+//#endregion —————————————————————————————————————————————————————————————————
+
+
+//#region —————————————————————————————————————————————————— Ta Dependence
+
+p_ta_supertrend(series float factor, simple int atrPeriod) =>
+    [supertrendLine, direction] = ta.supertrend(factor, atrPeriod)
+    buySignal = ta.crossunder(direction, 0)
+    sellSignal = ta.crossover(direction, 0)
+    [supertrendLine, direction, buySignal, sellSignal]
+
+//#endregion —————————————————————————————————————————————————————————————
+
+
+//#region —————————————————————————————————————————————————— Constants
+
+// Input Groups
+string P_GP_1      =      ""
+
+//#endregion —————————————————————————————————————————————————————————
+
+
+//#region —————————————————————————————————————————————————— Inputs
+
+// Default
+int p_inp_1        =      input.int(defval=20, title="Fast EMA Length", group=P_GP_1)
+int p_inp_2        =      input.int(defval=50, title="Slow EMA Length", group=P_GP_1)
+float p_inp_3      =      input.float(defval=3, title="Supertrend Factor", group=P_GP_1, step=0.01)
+
+
+//#endregion ———————————————————————————————————————————————————————
+
+//#region —————————————————————————————————————————————————— Indicators
+
+p_ind_1                                                                             =      ta.ema(close, p_inp_2) // Slow EMA
+p_ind_2                                                                             =      ta.ema(close, p_inp_1) // Fast EMA
+[p_ind_3_supertrend, p_ind_3_direction, p_ind_3_buySignal, p_ind_3_sellSignal]      =      p_ta_supertrend(p_inp_3, 10) // Supertrend
+
+
+//#endregion ———————————————————————————————————————————————————————————
+
+
+//#region —————————————————————————————————————————————————— Conditions
+
+p_cond_1      =      ta.crossover(p_ind_2, p_ind_1)
+p_cond_2      =      (p_cond_1)
+p_cond_3      =      ta.crossunder(p_ind_2, p_ind_1)
+p_cond_4      =      (p_cond_3)
+
+
+//#endregion ———————————————————————————————————————————————————————————
+
+
+//#region —————————————————————————————————————————————————— Indicator Plots
+
+// Slow EMA
+plot(p_ind_1, "Slow EMA", color.rgb(33, 150, 243, 0), 1)
+
+// Fast EMA
+plot(p_ind_2, "Fast EMA", color.rgb(255, 82, 82, 0), 1)
+
+// Supertrend
+p_ind_3_supertrend_value = barstate.isfirst ? na : p_ind_3_supertrend
+p_ind_3_supertrend_middle = plot(barstate.isfirst ? na : (open + close) / 2, "Supertrend - Middle", display=display.none)
+p_ind_3_supertrend_up = plot(p_ind_3_direction < 0 ? p_ind_3_supertrend_value : na, "Supertrend - Up Trend", color=color.rgb(76, 175, 80, 100), style=plot.style_linebr, linewidth=1)
+p_ind_3_supertrend_down = plot(p_ind_3_direction < 0 ? na : p_ind_3_supertrend_value, "Supertrend - Down Trend", color=color.rgb(255, 82, 82, 100), style=plot.style_linebr, linewidth=1)
+fill(p_ind_3_supertrend_middle, p_ind_3_supertrend_up, title="Supertrend - Up Trend Background", color=color.rgb(76, 175, 80, 85), fillgaps=false)
+fill(p_ind_3_supertrend_middle, p_ind_3_supertrend_down, title="Supertrend - Down Trend Background", color=color.rgb(255, 82, 82, 85), fillgaps=false)
+
+//#endregion ————————————————————————————————————————————————————————————————
+
+
+//#region —————————————————————————————————————————————————— Custom Plots
+
+// EMA Buy Signal
+plotchar(series=p_cond_2, title="EMA Buy Signal", char="▲", location=location.belowbar, color=color.rgb(0, 230, 118, 0), offset=0, text="EMA", textcolor=color.rgb(33, 150, 243, 0), size=size.tiny, display=display.all)
+
+// EMA Sell Signal
+plotchar(series=p_cond_4, title="EMA Sell Signal", char="▼", location=location.abovebar, color=color.rgb(255, 82, 82, 0), offset=0, text="EMA", textcolor=color.rgb(33, 150, 243, 0), size=size.tiny, display=display.all)
+
+// Supertrend Buy Signal
+plotchar(series=p_ind_3_buySignal, title="Supertrend Buy Signal", char="▲", location=location.belowbar, color=color.rgb(0, 230, 118, 0), offset=0, text="Supertrend", textcolor=color.rgb(33, 150, 243, 0), size=size.tiny, display=display.all)
+
+// Supertrend Sell Signal
+plotchar(series=p_ind_3_sellSignal, title="Supertrend Sell Signal", char="▼", location=location.abovebar, color=color.rgb(255, 82, 82, 0), offset=0, text="Supertrend", textcolor=color.rgb(33, 150, 243, 0), size=size.tiny, display=display.all)
+
+//#endregion —————————————————————————————————————————————————————————————
+
+
+//#region —————————————————————————————————————————————————— Alert
+
+if p_cond_2
+    string message = "EMA Buy Signal Alert\nTicker: " + syminfo.ticker + "\nPrice: " + str.tostring(close)
+    alert(message=message, freq=alert.freq_once_per_bar_close)
+
+if p_cond_4
+    string message = "EMA Sell Signal Alert\nTicker: " + syminfo.ticker + "\nPrice: " + str.tostring(close)
+    alert(message=message, freq=alert.freq_once_per_bar_close)
+
+if p_ind_3_buySignal
+    string message = "Supertrend Buy Signal Alert\nTicker: " + syminfo.ticker + "\nPrice: " + str.tostring(close)
+    alert(message=message, freq=alert.freq_once_per_bar_close)
+
+if p_ind_3_sellSignal
+    string message = "Supertrend Sell Signal Alert\nTicker: " + syminfo.ticker + "\nPrice: " + str.tostring(close)
+    alert(message=message, freq=alert.freq_once_per_bar_close)
+
+//#endregion ——————————————————————————————————————————————————————
