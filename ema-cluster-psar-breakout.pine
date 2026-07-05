@@ -113,6 +113,19 @@ sellSignal =
      volumeCondition and
      bodyCondition
 
+debugMode = input.bool(true, "Debug Logs", group = "Debug")
+
+if debugMode and barstate.isconfirmed and emaCluster and not buySignal and not sellSignal
+    log.info(
+         "Bar={0} | dir={1} | openBelow={2} closeAbove={3} | openAbove={4} closeBelow={5} | psarBull={6} psarBear={7} | volCond={8} vol={9} avgVol={10} | bodyCond={11} bodyRatio={12}",
+         bar_index,
+         bullishCandle ? "bull" : bearishCandle ? "bear" : "flat",
+         openBelow, closeAbove,
+         openAbove, closeBelow,
+         psarBull, psarBear,
+         volumeCondition, volume, avgVol,
+         bodyCondition, candleRange > 0 ? candleBody / candleRange : na)
+
 //========================
 // Plot Signals
 //========================
@@ -136,10 +149,13 @@ plotshape(showBuySell and sellSignal,
 //========================
 // Alerts
 //========================
-signalType = buySignal ? "BUY" : sellSignal ? "SELL" : na
-if (buySignal or sellSignal) and telegramChatId != ""
-    jsonMsg = '{"chat_id":"' + telegramChatId + '","text":"' +
-         signalType + " Signal on " + syminfo.ticker +
-         " (" + syminfo.description + ")" +
-         " Price=" + str.tostring(close) + '"}'
-    alert(jsonMsg, alert.freq_once_per_bar_close)
+
+alertcondition(
+     buySignal,
+     title="BUY ALERT",
+     message="BUY Signal on {{ticker}} Price={{close}}")
+
+alertcondition(
+     sellSignal,
+     title="SELL ALERT",
+     message="SELL Signal on {{ticker}} Price={{close}}")
