@@ -26,7 +26,8 @@ indicator("EMA Cluster PSAR Breakout", shorttitle="EMA Cluster PSAR Breakout", o
 emaFastLength  = input.int(5, "EMA Fast")
 emaMidLength   = input.int(10, "EMA Medium")
 emaSlowLength  = input.int(20, "EMA Slow")
-clusterPercent = input.float(0.30,
+emaSlowestLength  = input.int(200, "EMA Slowest")
+clusterPercent = input.float(0.55,
      "EMA Cluster (%)",
      step = 0.05)
 psarStep = input.float(0.02, "PSAR Step")
@@ -36,21 +37,22 @@ showBuySell = input.bool(true, "Show Signals")
 volMultiplier = input.float(1.2, "Volume Multiplier", step = 0.1, group = "Filters")
 bodyRatioMin  = input.float(0.50, "Min Body/Range Ratio", step = 0.05, group = "Filters")
 
-telegramChatId = input.string("", "Telegram Chat ID", group = "Alerts")
-
 //========================
 // EMA Calculation
 //========================
 ema5  = ta.ema(close, emaFastLength)
 ema10 = ta.ema(close, emaMidLength)
 ema20 = ta.ema(close, emaSlowLength)
+ema200 = ta.ema(close, emaSlowestLength)
 
 //========================
 // Plot EMAs
 //========================
-plot(ema5,  color=color.red,   linewidth=2, title="EMA 5")
-plot(ema10, color=color.green, linewidth=2, title="EMA 10")
-plot(ema20, color=color.blue,  linewidth=2, title="EMA 20")
+plot(ema5,  color=color.red,   linewidth=1, title="EMA 5")
+plot(ema10, color=color.green, linewidth=1, title="EMA 10")
+plot(ema20, color=color.blue,  linewidth=1, title="EMA 20")
+plot(ema200, color=color.black,  linewidth=2, title="EMA 200")
+
 
 //========================
 // EMA Cluster Logic
@@ -90,13 +92,19 @@ openBelow = open < lowestEMA
 closeAbove = close > highestEMA
 bullishCandle = close > open
 buySignal =
-     emaCluster and
-     bullishCandle and
-     openBelow and
-     closeAbove and
-     psarBull and
-     volumeCondition and
-     bodyCondition
+     emaCluster
+     and bullishCandle
+     and closeAbove
+     and psarBull 
+     and volumeCondition
+//     and bodyCondition
+
+watchLongSignal =
+     emaCluster
+     and bullishCandle
+     and closeAbove
+     and psarBull 
+//     and volumeCondition
 
 //========================
 // SELL Logic
@@ -105,44 +113,68 @@ openAbove = open > highestEMA
 closeBelow = close < lowestEMA
 bearishCandle = close < open
 sellSignal =
-     emaCluster and
-     bearishCandle and
-     openAbove and
-     closeBelow and
-     psarBear and
-     volumeCondition and
-     bodyCondition
+     emaCluster
+     and bearishCandle
+     and openAbove
+     and closeBelow
+     and psarBear
+     and volumeCondition
+//     and bodyCondition
+
+watchShortSignal =
+     emaCluster
+     and bearishCandle
+     and closeBelow
+//     and volumeCondition
+
 
 debugMode = input.bool(true, "Debug Logs", group = "Debug")
 
 if debugMode and barstate.isconfirmed and emaCluster and not buySignal and not sellSignal
     log.info(
-         "Bar={0} | dir={1} | openBelow={2} closeAbove={3} | openAbove={4} closeBelow={5} | psarBull={6} psarBear={7} | volCond={8} vol={9} avgVol={10} | bodyCond={11} bodyRatio={12}",
+         "Bar={0} | dir={1} | openBelow={2} closeAbove={3} | openAbove={4} closeBelow={5} | psarBull={6} psarBear={7} | volCond={8} vol={9} avgVol={10} | bodyCond={11} bodyRatio={12} | emaCluster={13} clusterDistance={14} clusterPercent={15}",
          bar_index,
          bullishCandle ? "bull" : bearishCandle ? "bear" : "flat",
          openBelow, closeAbove,
          openAbove, closeBelow,
          psarBull, psarBear,
          volumeCondition, volume, avgVol,
-         bodyCondition, candleRange > 0 ? candleBody / candleRange : na)
-
+         bodyCondition, candleRange > 0 ? candleBody / candleRange : na,
+         emaCluster,
+         clusterDistance,
+         clusterPercent)
 //========================
 // Plot Signals
 //========================
 plotshape(showBuySell and buySignal,
-     title="BUY",
      style=shape.labelup,
      location=location.belowbar,
      color=color.green,
      text="BUY",
      textcolor=color.white,
      size=size.small)
+
+plotshape(showBuySell and watchLongSignal,
+     style=shape.labelup,
+     location=location.belowbar,
+     color=color.blue,
+     text="WATCH",
+     textcolor=color.white,
+     size=size.small)
+
 plotshape(showBuySell and sellSignal,
-     title="SELL",
      style=shape.labeldown,
      location=location.abovebar,
      color=color.red,
      text="SELL",
+     textcolor=color.white,
+     size=size.small)
+
+plotshape(showBuySell and watchShortSignal,
+     style=shape.labelup,
+     location=location.belowbar,
+     color=color.orange,
+     text="WATCH",
      textcolor=color.white,
      size=size.small)
 
